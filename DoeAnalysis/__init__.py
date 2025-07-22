@@ -229,8 +229,14 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         # Support both new simplified format and legacy format
         if 'response_column' in req_body:
             # New simplified format (for AI Foundry)
-            response_vars = [req_body.get('response_column', 'DE*cmc')]
-            predictors = req_body.get('predictors', ["dye1", "dye2", "Temp", "Time", "Na2SO4 (g/L)", "Dyeing pH"])
+            response_column = req_body.get('response_column', 'DE*cmc')
+            # Handle multiple response variables in comma-separated format
+            if ',' in response_column:
+                response_vars = [col.strip() for col in response_column.split(',')]
+            else:
+                response_vars = [response_column]
+            # Use auto-detection if no predictors specified
+            predictors = req_body.get('predictors', None)  # Changed to None for auto-detection
             threshold = req_body.get('threshold', 1.3)
             min_significant = req_body.get('min_significant', 1)
             max_rows = req_body.get('max_samples', req_body.get('max_rows', 1000))
@@ -294,10 +300,21 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         else:
             df_analysis = df_raw
         # Auto-detect available predictors from the data if not specified
-        available_predictors = [col for col in df_analysis.columns if col in ['dye1', 'dye2', 'Temp', 'Time', 'Na2SO4 (g/L)', 'Dyeing pH', 'Config', 'Items']]
-        if not available_predictors:
-            # Fallback: try to identify numeric columns that could be predictors
-            available_predictors = [col for col in df_analysis.columns if df_analysis[col].dtype in ['int64', 'float64'] and col not in response_vars][:6]
+        if predictors is None:
+            # Auto-detect all potential predictors (exclude response variables)
+            available_predictors = [col for col in df_analysis.columns 
+                                  if df_analysis[col].dtype in ['int64', 'float64'] 
+                                  and col not in response_vars 
+                                  and df_analysis[col].nunique() > 1][:8]
+        else:
+            # Use specified predictors, but also check available ones for fallback
+            available_predictors = [col for col in df_analysis.columns if col in ['dye1', 'dye2', 'Temp', 'Time', 'Na2SO4 (g/L)', 'Dyeing pH', 'Config', 'Items']]
+            if not available_predictors:
+                # Fallback: try to identify numeric columns that could be predictors (exclude response variables)
+                available_predictors = [col for col in df_analysis.columns 
+                                      if df_analysis[col].dtype in ['int64', 'float64'] 
+                                      and col not in response_vars 
+                                      and df_analysis[col].nunique() > 1][:8]  # Increased limit for pharma data
         
         # Auto-map common AI Foundry column names to actual column names
         def map_ai_foundry_columns(pred_list, actual_columns):
@@ -306,10 +323,15 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             column_mapping = {
                 "Dye Concentration": ["dye1", "dye2", "dye", "concentration"],
                 "Temperature": ["Temp", "temperature", "temp"],
-                "Time": ["Time", "time"],
+                "Time": ["Time", "time", "Mix_Time", "mix_time"],
                 "pH": ["Dyeing pH", "pH", "ph"],
                 "Pressure": ["Pressure", "pressure"],
-                "Flow Rate": ["Flow", "flow_rate", "flowrate"]
+                "Flow Rate": ["Flow", "flow_rate", "flowrate"],
+                # Pharmaceutical formulation mappings
+                "Ingredient A": ["Ingredient_A", "ingredient_a", "component_a"],
+                "Ingredient B": ["Ingredient_B", "ingredient_b", "component_b"],
+                "Mix Time": ["Mix_Time", "mix_time", "mixing_time"],
+                "Mixing Time": ["Mix_Time", "mix_time", "mixing_time"]
             }
             
             for pred in pred_list:
@@ -331,7 +353,12 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             return mapped_predictors
         
         # Apply AI Foundry column mapping
-        mapped_predictors = map_ai_foundry_columns(predictors, df_analysis.columns)
+        if predictors is not None:
+            mapped_predictors = map_ai_foundry_columns(predictors, df_analysis.columns)
+        else:
+            # Use all available predictors when none specified
+            mapped_predictors = available_predictors
+            logging.info(f"Auto-detected predictors: {mapped_predictors}")
         
         # Filter out constant predictors (no variation)
         variable_predictors = []
