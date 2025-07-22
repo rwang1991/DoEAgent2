@@ -71,15 +71,23 @@ paths:
                 summary: AI Foundry Simplified Format (Recommended)
                 description: Easy format for AI Foundry integration with auto-detection
                 value:
-                  data: "https://raw.githubusercontent.com/rwang1991/DoEAgent/refs/heads/main/DOEData_20250622.csv"
+                  data: "https://raw.githubusercontent.com/rwang1991/DoEAgent2/refs/heads/main/TestData/DOEData_20250622.csv"
                   response_column: "DE*cmc"
                   force_full_dataset: true
                   threshold: 1.5
+              ai_foundry_multi_response:
+                summary: AI Foundry Multi-Response Analysis
+                description: Analyze multiple responses simultaneously using comma-separated string
+                value:
+                  data: "Ingredient_A,Ingredient_B,Mix_Time,Temperature,Dissolution,Hardness,Content_Uniformity\n10,5,15,25,78.5,45.2,98.7\n20,5,15,25,82.1,47.8,99.1\n10,15,15,25,79.8,44.6,98.9\n20,15,15,25,85.3,49.2,99.4"
+                  response_column: "Dissolution,Hardness,Content_Uniformity"
+                  force_full_dataset: true
+                  threshold: 1.5
               ai_foundry_with_predictors:
-                summary: AI Foundry with Predictor Mapping
+                summary: AI Foundry with Predictor Mapping (Legacy Format)
                 description: Uses AI Foundry generic column names (automatically mapped)
                 value:
-                  data: "https://raw.githubusercontent.com/rwang1991/DoEAgent/refs/heads/main/DOEData_20250622.csv"
+                  data: "https://raw.githubusercontent.com/rwang1991/DoEAgent2/refs/heads/main/TestData/DOEData_20250622.csv"
                   response_vars: ["DE*cmc"]
                   predictors: ["Dye Concentration", "Temperature", "Time", "pH"]
                   threshold: 1.5
@@ -188,8 +196,16 @@ components:
             - "Temp,Time,dye1,dye2,DE*cmc\n150,30,0.5,1.2,75.2"
         response_column:
           type: string
-          description: Single response variable column name to analyze
-          example: "DE*cmc"
+          description: |
+            Response variable(s) to analyze. Supports:
+            - Single response: "DE*cmc"
+            - Multiple responses: "Dissolution,Hardness,Content_Uniformity" (comma-separated string)
+            
+            ⚠️ **Important for AI Foundry**: Must be a comma-separated STRING, not an array!
+          examples:
+            - "DE*cmc"
+            - "Dissolution,Hardness,Content_Uniformity"
+            - "Yield,Purity,Strength"
         predictors:
           type: array
           items:
@@ -198,6 +214,8 @@ components:
             Optional list of predictor columns. If not specified, function auto-detects suitable predictors.
             Supports AI Foundry generic names that will be automatically mapped:
             - "Dye Concentration" → dye1, dye2
+            - "Temperature" → Temp
+            - "Mix Time" → Time
             - "Temperature" → Temp
             - "pH" → Dyeing pH
           example: ["Dye Concentration", "Temperature", "Time", "pH"]

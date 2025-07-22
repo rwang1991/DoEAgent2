@@ -47,8 +47,12 @@
                       },
                       "response_column": {
                         "type": "string",
-                        "description": "Single response variable column name to analyze",
-                        "example": "DE*cmc"
+                        "description": "Response variable(s) to analyze. Supports:\n- Single response: \"DE*cmc\"\n- Multiple responses: \"Dissolution,Hardness,Content_Uniformity\" (comma-separated string)\n\n⚠️ **Important for AI Foundry**: Must be a comma-separated STRING, not an array!",
+                        "examples": [
+                          "DE*cmc",
+                          "Dissolution,Hardness,Content_Uniformity", 
+                          "Yield,Purity,Strength"
+                        ]
                       },
                       "predictors": {
                         "type": "array",
