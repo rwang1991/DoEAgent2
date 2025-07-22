@@ -1,0 +1,11 @@
+azure-functions
+pandas
+numpy
+statsmodels
+matplotlib
+seaborn
+scikit-learn
+patsy
+scipy
+requests
+urllib3
