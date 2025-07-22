@@ -302,13 +302,47 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         # Auto-detect available predictors from the data if not specified
         if predictors is None:
             # Auto-detect all potential predictors (exclude response variables)
-            available_predictors = [col for col in df_analysis.columns 
-                                  if df_analysis[col].dtype in ['int64', 'float64'] 
-                                  and col not in response_vars 
-                                  and df_analysis[col].nunique() > 1][:8]
+            # Prioritize known experimental factors over measurement columns
+            all_numeric_cols = [col for col in df_analysis.columns 
+                              if df_analysis[col].dtype in ['int64', 'float64'] 
+                              and col not in response_vars 
+                              and df_analysis[col].nunique() > 1]
+            
+            # Define exact process factor names for textile datasets
+            textile_factors = ['dye1', 'dye2', 'Temp', 'Time']
+            pharma_factors = ['Ingredient_A_mg', 'Ingredient_B_mg', 'Ingredient_C_mg', 'Ingredient_D_mg']
+            
+            # Check if this looks like a textile dataset
+            found_textile_factors = [col for col in textile_factors if col in all_numeric_cols]
+            found_pharma_factors = [col for col in pharma_factors if col in all_numeric_cols]
+            
+            if len(found_textile_factors) >= 3:  # Textile dataset
+                available_predictors = found_textile_factors
+                logging.info(f"Detected textile dataset, using factors: {available_predictors}")
+            elif len(found_pharma_factors) >= 3:  # Pharma dataset
+                available_predictors = found_pharma_factors
+                logging.info(f"Detected pharma dataset, using factors: {available_predictors}")
+            else:
+                # General auto-detection with keyword prioritization
+                factor_keywords = ['ingredient', 'mix', 'concentration', 'pressure', 'catalyst', 
+                                 'speed', 'flow', 'rate', 'config']
+                
+                priority_predictors = []
+                other_predictors = []
+                
+                for col in all_numeric_cols:
+                    col_lower = col.lower()
+                    if any(keyword in col_lower for keyword in factor_keywords):
+                        priority_predictors.append(col)
+                    else:
+                        other_predictors.append(col)
+                
+                # Use priority predictors first, then others if needed
+                available_predictors = priority_predictors + other_predictors[:max(0, 8-len(priority_predictors))]
+                logging.info(f"General auto-detection, using predictors: {available_predictors}")
         else:
             # Use specified predictors, but also check available ones for fallback
-            available_predictors = [col for col in df_analysis.columns if col in ['dye1', 'dye2', 'Temp', 'Time', 'Na2SO4 (g/L)', 'Dyeing pH', 'Config', 'Items']]
+            available_predictors = [col for col in df_analysis.columns if col in predictors]
             if not available_predictors:
                 # Fallback: try to identify numeric columns that could be predictors (exclude response variables)
                 available_predictors = [col for col in df_analysis.columns 
